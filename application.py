@@ -1,6 +1,6 @@
 import streamlit as st
 import random
-from Bio import pairwise2
+from Bio import pairwise2, SeqIO
 from Bio.Seq import Seq
 from Bio.SeqUtils.ProtParam import ProteinAnalysis
 from Bio.SeqIO import parse, write
@@ -64,6 +64,11 @@ def convert_file_format(input_file, input_format, output_format):
     input_handle = StringIO(input_file)
     output_handle = StringIO()
     sequences = list(parse(input_handle, input_format))
+
+    if input_format == "fasta" and output_format == "fastq":
+        for record in sequences:
+            if "phred_quality" not in record.letter_annotations:
+                record.letter_annotations["phred_quality"] = [40] * len(record.seq)
     write(sequences, output_handle, output_format)
     return output_handle.getvalue()
 
@@ -79,7 +84,6 @@ def calculate_jaccard_distance(seq1, seq2):
     set2 = set(seq2)
     return 1 - len(set1.intersection(set2)) / len(set1.union(set2))
 
-# Home Page
 # Home Page
 def home():
     #st.title("Welcome to Enigma!")
