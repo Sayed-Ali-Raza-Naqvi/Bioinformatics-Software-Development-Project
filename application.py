@@ -20,8 +20,11 @@ def generate_reverse_complement(seq):
     return reverse_complement
 
 # Function to align two sequences
-def align_sequences(seq1, seq2):
-    alignments = pairwise2.align.globalxx(seq1, seq2)
+def align_sequences(seq1, seq2, alignment_type):
+    if alignment_type == "Global":
+        alignments = pairwise2.align.globalxx(seq1, seq2)
+    else:
+        alignments = pairwise2.align.localxx(seq1, seq2)
     return alignments
 
 # Function to randomize sequence
@@ -79,7 +82,7 @@ def calculate_jaccard_distance(seq1, seq2):
 # Home Page
 # Home Page
 def home():
-    st.title("Welcome to Enigma!")
+    #st.title("Welcome to Enigma!")
     st.markdown("<p class='title-animation'></p>", unsafe_allow_html=True)
     st.markdown("<p style='font-size: 18px;'>A simple bioinformatics suite.</p>", unsafe_allow_html=True)
     
@@ -93,7 +96,7 @@ def home():
     }
 
     .title-animation::after {
-        content: 'Enigma';
+        content: 'Welcome to Enigma';
         display: inline-block;
         overflow: hidden;
         width: 0;
@@ -134,11 +137,13 @@ def tools():
     elif tool == "Sequence Alignment Viewer":
         # Sequence Alignment Viewer tool implementation
         st.header("Sequence Alignment Viewer")
-        seq1 = st.text_area("Enter the first sequence")
-        seq2 = st.text_area("Enter the second sequence")
+        seq1 = st.text_area("Enter the first sequence", height=100)
+        seq2 = st.text_area("Enter the second sequence", height=100)
+        alignment_type = st.radio("Choose alignment type:", ("Global", "Local"))
+
         if st.button("Align Sequences"):
             if seq1 and seq2:
-                alignments = align_sequences(seq1, seq2)
+                alignments = align_sequences(seq1, seq2, alignment_type)
                 st.write("Alignments:")
                 for alignment in alignments:
                     st.text(pairwise2.format_alignment(*alignment))
@@ -237,116 +242,63 @@ def tools():
 def pipeline():
     st.title("Enigma Pipeline")
     st.subheader("Sequence Input")
-    sequence_input = st.text_area("Enter DNA or protein sequence")
 
-    if sequence_input:
-        sequence = Seq(sequence_input.upper())
+    sequence_input = ""
+    input_method = st.radio("Choose input method:", ("Enter sequence", "Upload FASTA file"))
 
-        # Sequence Translation
-        genetic_code = st.selectbox("Select genetic code", ["Standard", "Bacterial", "Yeast", "Custom"])
-        if genetic_code == "Custom":
-            custom_code = st.text_input("Enter custom genetic code (in NCBI table format)")
-            try:
-                genetic_code = int(custom_code)
-            except ValueError:
-                st.error("Please enter a valid custom genetic code (an integer)")
-                st.stop()
+    if input_method == "Enter sequence":
+        sequence_input = st.text_area("Enter DNA sequence")
+    else:
+        uploaded_file = st.file_uploader("Upload FASTA file", type=["fasta"])
+        if uploaded_file is not None:
+            sequence_data = uploaded_file.read().decode("utf-8")
+            fasta_sequence = SeqIO.read(StringIO(sequence_data), "fasta")
+            sequence_input = str(fasta_sequence.seq)
 
-        translated_seq = sequence.translate(table=genetic_code)
+    if st.button("Submit"):
+        if sequence_input:
+            sequence = Seq(sequence_input.upper())
 
-        # Tool selection
-        selected_tool = st.selectbox("Select a tool", ["Sequence Length", "Reverse Complement", "Alignment Viewer",
-                                                       "Randomize Sequence", "GC Content", "ORF Finder",
-                                                       "Isoelectric Point", "Secondary Structure Predictor",
-                                                       "File Format Converter", "Genomic Distance Calculator"])
+            # Transcription
+            transcribed_seq = sequence.transcribe()
 
-        if selected_tool == "Sequence Length":
-            st.subheader("Sequence Length Calculator")
-            st.write(f"The length of the sequence is: {len(translated_seq)}")
+            # Translation
+            translated_seq = transcribed_seq.translate()
 
-        elif selected_tool == "Reverse Complement":
-            st.subheader("Reverse Complement Generator")
-            reverse_complement = sequence.reverse_complement()
-            st.write(f"Reverse complement: {reverse_complement}")
+            # Isoelectric Point Calculation
+            protein_analysis = ProteinAnalysis(str(translated_seq))
+            isoelectric_point = protein_analysis.isoelectric_point()
 
-        elif selected_tool == "Alignment Viewer":
-            st.subheader("Sequence Alignment Viewer")
-            seq_to_align = st.text_area("Enter the second sequence to align with:")
-            if st.button("Align Sequences"):
-                alignments = pairwise2.align.globalxx(str(sequence), str(seq_to_align))
-                for alignment in alignments:
-                    st.text(format_alignment(*alignment))
+            # GC Content Calculation
+            gc_content = calculate_gc_content(sequence)
 
-        elif selected_tool == "Randomize Sequence":
-            st.subheader("Sequence Randomizer")
-            randomized_sequence = ''.join(random.sample(str(sequence), len(sequence)))
-            st.write(f"Randomized sequence: {randomized_sequence}")
+            # ORF Finder
+            orfs = find_orfs(str(sequence))
 
-        elif selected_tool == "GC Content":
-            st.subheader("GC Content Calculator")
-            gc_content, gc_count, at_count = calculate_gc_content(str(sequence))
+            # Display results
+            st.subheader("Results")
+            st.write("### Transcribed Sequence")
+            st.write(transcribed_seq)
+
+            st.write("### Translated Sequence")
+            st.write(translated_seq)
+
+            st.write("### Isoelectric Point of Protein")
+            st.write(f"{isoelectric_point:.2f}")
+
+            st.write("### GC Content")
+            gc_content, gc_count, at_count = calculate_gc_content(sequence)
             st.write(f"GC content: {gc_content:.2f}%")
-            
+                
             fig, ax = plt.subplots()
             ax.pie([gc_count, at_count], labels=['GC', 'AT'], autopct='%1.1f%%', colors=['#66b3ff', '#ffcc99'])
             ax.axis('equal')  # Equal aspect ratio ensures that pie is drawn as a circle.
             st.pyplot(fig)
 
-        elif selected_tool == "ORF Finder":
-            st.subheader("ORF Finder")
-            orfs = find_orfs(str(sequence))
-            st.write("Open Reading Frames (ORFs):")
+            st.write("### Open Reading Frames (ORFs)")
             for i, orf in enumerate(orfs):
                 st.text(f"ORF {i+1}: {orf}")
-
-        elif selected_tool == "Isoelectric Point":
-            st.subheader("Protein Isoelectric Point Calculator")
-            protein_seq = sequence_input.upper()
-            pi = calculate_isoelectric_point(protein_seq)
-            st.write(f"Isoelectric point (pI): {pi:.2f}")
-
-        elif selected_tool == "Secondary Structure Predictor":
-            st.subheader("Protein Secondary Structure Predictor")
-            protein_seq = sequence_input.upper()
-            helix, sheet, coil = predict_secondary_structure(protein_seq)
-            st.write(f"Helix: {helix*100:.2f}%")
-            st.write(f"Sheet: {sheet*100:.2f}%")
-            st.write(f"Coil: {coil*100:.2f}%")
-
-        elif selected_tool == "File Format Converter":
-            st.subheader("File Format Converter")
-            uploaded_file_format = st.file_uploader("Upload a file to convert", type=["fasta", "fastq"])
-            input_format = st.selectbox("Select input format", ["fasta", "fastq"])
-            output_format = st.selectbox("Select output format", ["fasta", "fastq"])
-
-            if st.button("Convert File Format"):
-                if uploaded_file_format:
-                    input_file_str = uploaded_file_format.read().decode("utf-8")
-                    converted_file_str = convert_file_format(input_file_str, input_format, output_format)
-                    st.download_button("Download converted file", data=converted_file_str, file_name=f"converted.{output_format}")
-                else:
-                    st.error("Please upload a file.")
-
-        elif selected_tool == "Genomic Distance Calculator":
-            st.subheader("Genomic Distance Calculator")
-            distance_seq2 = st.text_area("Enter the second sequence for distance calculation")
-            distance_method = st.selectbox("Select distance calculation method", ["Hamming", "Jaccard"])
-
-            if st.button("Calculate Genomic Distance"):
-                if distance_seq2:
-                    if distance_method == "Hamming":
-                        distance = calculate_hamming_distance(sequence_input, distance_seq2)
-                        st.write(f"Hamming distance: {distance}")
-                    elif distance_method == "Jaccard":
-                        distance = calculate_jaccard_distance(sequence_input, distance_seq2)
-                        st.write(f"Jaccard distance: {distance:.2f}")
-                else:
-                    st.error("Please provide the second sequence for distance calculation.")
-
-
-        else:
-            st.error("Please select a tool from the sidebar.")
-
+            
 # About Page
 def about():
     st.title("About Enigma")
@@ -358,11 +310,8 @@ def about():
     <style>
     .footer {
         display: flex;
-        justify-content: center;
-        align-items: center;
         position: fixed;
         bottom: 0;
-        width: 40%;
         height: 70px; /* Adjust height as needed */
     }
     </style>
@@ -373,7 +322,6 @@ def about():
 st.set_page_config(page_title="Enigma", page_icon="🔬")
 
 # Page Navigation
-
 page = st.sidebar.radio("Go to", ["Home", "Tools", "Pipeline", "About"])
 
 if page == "Home":
