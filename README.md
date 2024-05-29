@@ -26,4 +26,4 @@ Enigma is built using the following technologies:
 - Python: The primary programming language used for development.
 - Streamlit: A Python library for building interactive web applications.
 - Biopython: A collection of tools for biological computation, widely used in bioinformatics.
-- Matplotlib: A plotting library for creating visualizations in Python.
+- Plotly: A plotting library for creating visualizations in Python.
