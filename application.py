@@ -5,7 +5,8 @@ from Bio.Seq import Seq
 from Bio.SeqUtils.ProtParam import ProteinAnalysis
 from Bio.SeqIO import parse, write
 from io import StringIO
-import matplotlib.pyplot as plt
+from Bio.SeqRecord import SeqRecord
+import plotly.graph_objects as go
 
 # Function to calculate sequence length
 def calculate_sequence_length(input_seq):
@@ -61,16 +62,33 @@ def predict_secondary_structure(protein_seq):
 
 # Function to convert file formats
 def convert_file_format(input_file, input_format, output_format):
+    # Ensure the input and output formats are supported
+    supported_formats = ["fasta", "fastq"]
+    if input_format not in supported_formats or output_format not in supported_formats:
+        raise ValueError("Unsupported file format")
+
     input_handle = StringIO(input_file)
     output_handle = StringIO()
     sequences = list(parse(input_handle, input_format))
 
+    # If converting from FASTA to FASTQ, ensure quality scores are added
     if input_format == "fasta" and output_format == "fastq":
         for record in sequences:
-            if "phred_quality" not in record.letter_annotations:
-                record.letter_annotations["phred_quality"] = [40] * len(record.seq)
+            if not record.letter_annotations.get("phred_quality"):
+                record.letter_annotations["phred_quality"] = [40] * len(record.seq)  # Assigning a default quality score of 40
+
     write(sequences, output_handle, output_format)
     return output_handle.getvalue()
+
+# Function to create pie chart.
+def create_pie_chart(gc_count, at_count):
+    labels = ['GC', 'AT']
+    values = [gc_count, at_count]
+    colors = ['#008080', '#FF7F11']
+
+    fig = go.Figure(data=[go.Pie(labels=labels, values=values, textinfo='percent', marker=dict(colors=colors))])
+    fig.update_layout(title='GC vs AT Content', title_x=0.5)
+    return fig
 
 # Function to calculate genomic distance using Hamming distance
 def calculate_hamming_distance(seq1, seq2):
@@ -172,10 +190,8 @@ def tools():
                 gc_content, gc_count, at_count = calculate_gc_content(gc_seq)
                 st.write(f"GC content: {gc_content:.2f}%")
                 
-                fig, ax = plt.subplots()
-                ax.pie([gc_count, at_count], labels=['GC', 'AT'], autopct='%1.1f%%', colors=['#66b3ff', '#ffcc99'])
-                ax.axis('equal')  # Equal aspect ratio ensures that pie is drawn as a circle.
-                st.pyplot(fig)
+                fig = create_pie_chart(gc_count, at_count)
+                st.plotly_chart(fig)
             else:
                 st.error("Please provide a sequence.")
     elif tool == "ORF Finder":
@@ -294,10 +310,8 @@ def pipeline():
             gc_content, gc_count, at_count = calculate_gc_content(sequence)
             st.write(f"GC content: {gc_content:.2f}%")
                 
-            fig, ax = plt.subplots()
-            ax.pie([gc_count, at_count], labels=['GC', 'AT'], autopct='%1.1f%%', colors=['#66b3ff', '#ffcc99'])
-            ax.axis('equal')  # Equal aspect ratio ensures that pie is drawn as a circle.
-            st.pyplot(fig)
+            fig = create_pie_chart(gc_count, at_count)
+            st.plotly_chart(fig)
 
             st.write("### Open Reading Frames (ORFs)")
             for i, orf in enumerate(orfs):
